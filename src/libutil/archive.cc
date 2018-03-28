@@ -74,23 +74,20 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     else if (S_ISDIR(st.st_mode)) {
         sink << "type" << "directory";
 
-        /* If we're on a case-insensitive system like macOS, undo
-           the case hack applied by restorePath(). */
+        /* Always undo the case hack if detected. Allows self transfer to correct #2009. */
         std::map<string, string> unhacked;
-        for (auto & i : readDirectory(path))
-            if (useCaseHack) {
-                string name(i.name);
-                size_t pos = i.name.find(caseHackSuffix);
-                if (pos != string::npos) {
-                    debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
-                    name.erase(pos);
-                }
-                if (unhacked.find(name) != unhacked.end())
-                    throw Error(format("file name collision in between '%1%' and '%2%'")
-                        % (path + "/" + unhacked[name]) % (path + "/" + i.name));
-                unhacked[name] = i.name;
-            } else
-                unhacked[i.name] = i.name;
+        for (auto & i : readDirectory(path)) {
+            string name(i.name);
+            size_t pos = i.name.find(caseHackSuffix);
+            if (pos != string::npos) {
+                debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
+                name.erase(pos);
+            }
+            if (unhacked.find(name) != unhacked.end())
+                throw Error(format("file name collision in between '%1%' and '%2%'")
+                    % (path + "/" + unhacked[name]) % (path + "/" + i.name));
+            unhacked[name] = i.name;
+        }
 
         for (auto & i : unhacked)
             if (filter(path + "/" + i.first)) {
